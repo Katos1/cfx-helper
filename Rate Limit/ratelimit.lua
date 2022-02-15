@@ -4,6 +4,15 @@ local function msecToSeconds(msec)
   return msec / 1000
 end
 
+local function setTrackerState(rateKey, entries)
+  assert(type(rateKey) == 'string')
+  assert(type(entries) == 'table')
+  assert(rateLimitTracker[rateKey])
+
+  local property, value = table.unpack(entries)
+  rateLimitTracker[rateKey][property] = value
+end
+
 function CreateRateLimiter(rateKey, rateOptions)
   assert(type(rateKey) == 'string')
   assert(type(rateOptions) == 'table')
@@ -24,37 +33,38 @@ function ConsumeRateLimit(rateKey, rateAmount, cb)
   assert(type(rateAmount) == 'number')
   assert(type(cb) == 'function')
 
-  -- Make sure ratelimit exists
   local rateLimitOptions = rateLimitTracker[rateKey]
+  local currTime = os.time()
+
+  -- Make sure ratelimit exists
   if not rateLimitOptions then
     return
   end
 
-  local currTime = os.time()
+  local unlockTime = rateLimitOptions.unlockTime
   local maxAmount = rateLimitOptions.maxAmount
   local newAmount = rateLimitOptions.amount + rateAmount or 0
   local rateInterval = rateLimitOptions.interval
   local isLocked = rateLimitOptions.lockState
 
   -- Checks if the rate limit is locked
-  if rateLimitOptions.unlockTime <= currTime then
+  if unlockTime <= currTime then
     if newAmount > maxAmount then
       if not isLocked then
         -- Locks the ratelimiter
-        rateLimitTracker[rateKey].lockState = true
-        rateLimitTracker[rateKey].unlockTime = currTime + msecToSeconds(rateInterval)
+        local lockTime = currTime + msecToSeconds(rateInterval)
+
+        setTrackerState(rateKey, {'lockState', true})
+        setTrackerState(rateKey, {'unlockTime', lockTime})
 
         return cb(false, maxAmount)
       end
 
       -- Unlocks the ratelimiter
-      rateLimitTracker[rateKey].lockState = false
-      rateLimitTracker[rateKey].amount = rateAmount
-
-      return cb(true, newAmount)
+      setTrackerState(rateKey, {'lockState', false})
+      setTrackerState(rateKey, {'amount', rateAmount})
     end
 
-    rateLimitOptions.amount = newAmount
     return cb(true, newAmount)
   end
 
