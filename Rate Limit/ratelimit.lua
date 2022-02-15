@@ -65,6 +65,7 @@ function ConsumeRateLimit(rateKey, rateAmount, cb)
       setTrackerState(rateKey, {'amount', rateAmount})
     end
 
+    setTrackerState(rateKey, {'amount', newAmount})
     return cb(true, newAmount)
   end
 
