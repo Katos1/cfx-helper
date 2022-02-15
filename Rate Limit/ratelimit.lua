@@ -48,7 +48,7 @@ function ConsumeRateLimit(rateKey, rateAmount, cb)
   local isLocked = rateLimitOptions.lockState
 
   -- Checks if the rate limit is locked
-  if unlockTime <= currTime then
+  if currTime >= unlockTime then
     if newAmount > maxAmount then
       if not isLocked then
         -- Locks the ratelimiter
@@ -63,6 +63,8 @@ function ConsumeRateLimit(rateKey, rateAmount, cb)
       -- Unlocks the ratelimiter
       setTrackerState(rateKey, {'lockState', false})
       setTrackerState(rateKey, {'amount', rateAmount})
+      
+      return cb(true, rateAmount)
     end
 
     setTrackerState(rateKey, {'amount', newAmount})
